@@ -1,5 +1,9 @@
 # Milestone 2: hidden geometry prototype
 
+For the scoped navigation/return extension, see
+[Milestone 3 smoke test](workspace-navigation-smoke.md). The geometry-only
+console methods documented here remain available.
+
 This development-only prototype draws the validated milestone 1 fictional fixture
 using the existing viewer. It does not navigate, change clearance, select maps,
 toggle layers, add widgets, persist state, or start agents. The fixed Austin-area

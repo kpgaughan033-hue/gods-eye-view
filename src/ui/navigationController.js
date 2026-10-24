@@ -261,6 +261,54 @@ export class NavigationController {
   subscribeCameraHandoff(listener) {
     return this._cameraHandoffs.subscribe(listener, { emitCurrent: false });
   }
+  /** A scoped writer borrows this owner's generation; any newer intent revokes it. */
+  claimScopedCamera({ isBusy = () => false } = {}) {
+    if (
+      this._disposed ||
+      this.isCockpitActive() ||
+      this.viewer.trackedEntity ||
+      isBusy()
+    )
+      return null;
+    const generation = this._navigationGeneration + 1;
+    this._stampNavigation();
+    // Publishing a stamp is reentrant. A listener can claim a newer generation
+    // before _stampNavigation returns; never release or adopt that successor.
+    if (
+      this._disposed ||
+      this._navigationGeneration !== generation ||
+      this.viewer.trackedEntity ||
+      this.isCockpitActive() ||
+      isBusy()
+    )
+      return null;
+    this._releaseFollowCamera();
+    if (this._disposed || this._navigationGeneration !== generation)
+      return null;
+    const controller = new AbortController();
+    let released = false;
+    const isCurrent = () =>
+      !released && !this._disposed && generation === this._navigationGeneration;
+    const release = () => {
+      if (released) return;
+      released = true;
+      unsubscribe();
+      controller.abort();
+    };
+    const unsubscribe = this.subscribeCameraHandoff(() => {
+      if (!isCurrent()) release();
+    });
+    if (!isCurrent()) {
+      release();
+      return null;
+    }
+    return Object.freeze({
+      generation,
+      signal: controller.signal,
+      isCurrent,
+      release,
+    });
+  }
   stop() {
     cancelCameraArrival(this.viewer);
     this._disposed = true;
