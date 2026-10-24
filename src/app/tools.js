@@ -26,6 +26,7 @@ export function createApplicationTools({
   startChrome,
   onSceneDirector,
   sceneDataPacks,
+  installDevelopmentWorkspace,
   signal,
   defer,
 }) {
@@ -199,5 +200,7 @@ export function createApplicationTools({
       signal,
     }),
   );
+  // Optional installer must register ownership through defer before async work.
+  installDevelopmentWorkspace?.({ viewer, signal, defer, debug });
   return { sceneDirector, annotations, voiceCommands };
 }
