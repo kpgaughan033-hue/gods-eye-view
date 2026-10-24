@@ -150,3 +150,48 @@ test('Cesium completion wrapper cannot re-enable inputs while a workspace lease 
   restore();
   assert.equal(f.controller.enableInputs, true);
 });
+
+test('cutaway subjects including monitor fit both documented viewport aspects (CPU projection)', async () => {
+  const { createCoordinateFrames } = await import('./coordinates.js');
+  const { PerspectiveFrustum } = await import('cesium');
+  const f = fixture();
+  const frames = createCoordinateFrames(f.document);
+  for (const node of f.document.nodes.slice(1, 5)) {
+    const pose = f.adapter.pose(node);
+    const eye = new Cartesian3(...pose.position);
+    const forward = new Cartesian3(...pose.direction);
+    const up = new Cartesian3(...pose.up);
+    const right = Cartesian3.cross(forward, up, new Cartesian3());
+    const min = node.bounds.minM;
+    const max = [...node.bounds.maxM];
+    if (node.kind === 'desk') max[2] = 1.38; // Passive monitor extends above semantic desk bounds.
+    for (const width of [800, 1280]) {
+      const frustum = new PerspectiveFrustum({
+        fov: Math.PI / 3,
+        aspectRatio: width / 900,
+        near: 0.05,
+        far: 1000,
+      });
+      for (const x of [min[0], max[0]])
+        for (const y of [min[1], max[1]])
+          for (const z of [min[2], max[2]]) {
+            const point = new Cartesian3(
+              ...frames.localToEcef(node.id, [x, y, z]),
+            );
+            const offset = Cartesian3.subtract(point, eye, new Cartesian3());
+            const depth = Cartesian3.dot(offset, forward);
+            assert.ok(depth > 0.05, `${node.kind} behind near plane`);
+            const vertical =
+              Math.abs(Cartesian3.dot(offset, up)) /
+              (depth * Math.tan(frustum.fovy / 2));
+            const horizontal =
+              Math.abs(Cartesian3.dot(offset, right)) /
+              (depth * Math.tan(frustum.fovy / 2) * frustum.aspectRatio);
+            assert.ok(
+              vertical < 0.85 && horizontal < 0.85,
+              `${node.kind} ${width}: ${horizontal}, ${vertical}`,
+            );
+          }
+    }
+  }
+});

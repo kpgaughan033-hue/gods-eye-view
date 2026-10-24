@@ -82,14 +82,17 @@ motion as well as playback. Existing normal navigation routes are unchanged.
    };
    const primitiveCount = v.scene.primitives.length;
    const controls = v.scene.screenSpaceCameraController;
-   const settings = [controls.enableInputs, controls.enableCollisionDetection,
-     v.camera.frustum.near];
+   const settings = [
+     controls.enableInputs,
+     controls.enableCollisionDetection,
+     v.camera.frustum.near,
+   ];
    ```
 
 4. Await each action: `await w.enter()` reaches the building, then three
    `await w.enterChild()` calls reach floor, office and desk. Each returns true;
    `w.getNavigationState().scopeId` ends at `demo-desk-001`. Inspect the synthetic
-   wireframes, slab and desk. There is no application widget. Requests without
+   cutaway exterior, floor, room and desk described below. There is no application widget. Requests without
    awaiting use latest-intent semantics, not a queued cinematic sequence.
 5. `await w.back()` returns to office. `await w.goTo('demo-building-001')` visits
    that ancestor. `await w.exit()` restores the captured globe camera. Check
@@ -111,7 +114,7 @@ motion as well as playback. Existing normal navigation routes are unchanged.
    removes the entry and cleans up before the scene; reload afterward. In the
    console, import the exact loaded module URL (including any Vite timestamp):
    `const mainUrl = [...document.scripts].find(s => s.src && new URL(s.src).pathname === '/src/main.js').src;
-   await (await import(mainUrl)).application.destroy();` A bare second entry URL
+await (await import(mainUrl)).application.destroy();` A bare second entry URL
    after HMR can intentionally trip the application's singleton guard.
 10. Build and run `npm run preview`. The same query flag must expose no workspace
     entry. Existing map, layer, share, provider and voice UI remain present.
@@ -124,7 +127,7 @@ Start a separate development server, then use the existing Puppeteer dependency:
 PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
   node scripts/qa-workspace-navigation.mjs \
   --url http://127.0.0.1:4175 --software \
-  --screenshot /tmp/workspace-desk.png
+  --evidence-dir /tmp/workspace-evidence
 ```
 
 Use your installed browser path, or Puppeteer's managed browser if installed.
@@ -132,7 +135,7 @@ Use your installed browser path, or Puppeteer's managed browser if installed.
 hardware acceleration was available. The script reports the actual renderer.
 It blocks external browser requests, drives the real viewer through desk, Back,
 ancestor and captured return, measures precision, checks settings/collection
-cleanup, search/manual handoff and destruction, and fails on scene/page errors.
+cleanup, 20 enter/exit cycles, search/manual handoff and destruction, and fails on scene/page errors. With `--evidence-dir`, it captures all four scopes at 1280 × 900 and 800 × 900 (DPR 1), checking scope IDs at each step. The narrower width approximates the canvas space left by docked DevTools; it does not automate Firefox DevTools.
 It does not test live providers or public location-search results.
 
 Do not run against a developer's unrelated active browser task. If parallel
@@ -183,3 +186,61 @@ whitespace checks passed. The build retained its existing large-chunk warning.
 Production JS contained no workspace-entry/fixture identifiers, and production
 preview ignored the query flag. GitHub Actions was not verified locally and is
 a required review gate on the eventual PR.
+
+## Issue #9: lightweight fictional cutaway
+
+The same fixed Austin WGS84 anchor (-97.7431°, 30.2672°, **200 m
+ellipsoidal height**) remains synthetic. These shapes do not correspond to a
+real building, interior, terrain elevation or survey. Geometry is deliberately
+an open-front architectural model, not an enclosed photorealistic room.
+
+- **Building:** blue rear facade and foundation, pale corner columns, three roof
+  rails and silhouette edges; amber entrance step and open door frame. There is
+  no solid roof or south facade to block the interior camera.
+- **Floor:** slate slab, pale perimeter, short partition and amber approach aisle.
+  The building remains around it as context; this view looks down into the model.
+- **Office:** warm room pad, two tall walls, low front boundary with a doorway
+  and amber threshold. The south/east sides stay open for the oblique preset.
+- **Desk:** wood-colored 6 cm desktop with contrasting edge, four dark legs,
+  monitor with cyan passive screen, stand/base and pale keyboard. The monitor is
+  just geometry: no interactive widget, DOM surface or application runtime.
+
+`src/workspace/geometry.js` contains 34 box/outline parts in fixture-local
+metres. `cesiumAdapter.js` converts those through the existing coordinate frames
+and owns them in the same private collection. All parts are acquired once per
+session, use opaque flat colors, synchronous tiny box geometry and disabled
+picking. No textures, external assets, extra render loop, render hold, shadows,
+provider changes or clipping planes are added. The four camera presets alone
+change framing; lease, transitions, cancellation, scoped settings and captured
+return remain in the existing Milestone 3 owners.
+
+### Compact Firefox walkthrough and screenshots
+
+Keep DevTools docked before beginning. Use at least an 800 × 900 viewport when
+comparing with automated evidence. Existing HUD/panels are preserved and may
+cover some geometry at other sizes; do not click or scroll the scene to frame a
+screenshot because physical input intentionally yields the workspace lease.
+Use the browser/OS screenshot command rather than simulating input over canvas.
+
+```js
+const w = window.__godsEyeView.workspacePrototype;
+await w.enter(); // building: exterior, roof rails, amber entrance
+w.getNavigationState().scopeId; // demo-building-001; capture screenshot
+await w.enterChild(); // floor: slab, perimeter, partition, aisle
+w.getNavigationState().scopeId; // demo-floor-001; capture screenshot
+await w.enterChild(); // office: warm walls, doorway, desk inside
+w.getNavigationState().scopeId; // demo-office-001; capture screenshot
+await w.enterChild(); // desk: entire top, legs, monitor, keyboard
+w.getNavigationState().scopeId; // demo-desk-001; capture screenshot
+await w.back(); // demo-office-001
+await w.exit(); // demo-globe-001, original precise captured camera
+```
+
+Record browser/version, viewport, renderer, map stack and any panel occlusion
+with screenshots. Test Firefox on the target older Mac separately: software
+Chromium screenshots establish actual rendering in that environment, not
+Firefox compatibility, hardware frame rates or target-machine visual signoff.
+
+Actual issue #9 screenshots and executed checks are recorded in the
+[evidence directory](evidence/issue-9/README.md). Historical Milestone 3
+results above describe its original validation, not this visual pass.

@@ -1,0 +1,63 @@
+{
+  "captures": [
+    {
+      "scope": "demo-building-001",
+      "width": 1280,
+      "path": "building-1280.png"
+    },
+    {
+      "scope": "demo-building-001",
+      "width": 800,
+      "path": "building-800.png"
+    },
+    {
+      "scope": "demo-floor-001",
+      "width": 1280,
+      "path": "floor-1280.png"
+    },
+    {
+      "scope": "demo-floor-001",
+      "width": 800,
+      "path": "floor-800.png"
+    },
+    {
+      "scope": "demo-office-001",
+      "width": 1280,
+      "path": "office-1280.png"
+    },
+    {
+      "scope": "demo-office-001",
+      "width": 800,
+      "path": "office-800.png"
+    },
+    {
+      "scope": "demo-desk-001",
+      "width": 1280,
+      "path": "desk-1280.png"
+    },
+    {
+      "scope": "demo-desk-001",
+      "width": 800,
+      "path": "desk-800.png"
+    }
+  ],
+  "desk": {
+    "scope": "demo-desk-001",
+    "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "map": "osm"
+  },
+  "result": {
+    "cyclesWithoutLeaks": 20,
+    "distanceM": 0,
+    "orientationDeg": 0,
+    "collectionCountRestored": true,
+    "cameraSettingsRestored": true,
+    "searchHandoff": true,
+    "manualHandoff": true,
+    "teardown": true,
+    "sceneErrors": []
+  },
+  "pageErrors": [],
+  "externalBrowserRequests": "blocked",
+  "softwareRequested": true
+}

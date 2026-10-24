@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createCesiumWorkspaceAdapter } from './cesiumAdapter.js';
+import { workspaceBoxParts } from './geometry.js';
 import { createWorkspaceFixture } from './fixture.js';
 import { createWorkspaceSession } from './session.js';
 import { createCoordinateFrames } from './coordinates.js';
@@ -96,31 +97,29 @@ function fixture({ failAt = -1 } = {}) {
   };
 }
 
-test('hidden acquisition builds only four fixture boxes; release leaves shared resources untouched', async () => {
+test('hidden acquisition builds bounded cutaway parts; release leaves shared resources untouched', async () => {
   const f = fixture();
   assert.equal(f.parent.children.length, 1);
   await f.session.acquire();
   assert.equal(f.collection.show, false);
-  assert.equal(f.collection.children.length, 4);
+  const expected = createWorkspaceFixture()
+    .nodes.filter((n) => n.bounds && n.kind !== 'application')
+    .flatMap((n) => workspaceBoxParts(n));
+  assert.equal(f.collection.children.length, expected.length);
+  assert.ok(expected.length <= 40);
   assert.deepEqual(
-    f.specs.map((s) => s.nodeId),
+    [...new Set(f.specs.map((s) => s.nodeId))],
     ['demo-building-001', 'demo-floor-001', 'demo-office-001', 'demo-desk-001'],
   );
-  assert.deepEqual(f.specs[1].dimensionsM, [18, 14, 0.1]);
-  assert.deepEqual(f.specs[3].dimensionsM, [1.6, 0.8, 0.75]);
-  assert.deepEqual(
-    f.specs.map((s) => s.outline),
-    [true, false, true, false],
-  );
+  const desktop = f.specs.find((s) => s.part === 'desktop');
+  assert.deepEqual(desktop.dimensionsM.slice(0, 2), [1.6, 0.8]);
+  assert.ok(Math.abs(desktop.dimensionsM[2] - 0.06) < 1e-12);
   await f.session.activate();
   assert.equal(f.collection.show, true);
   f.session.deactivate();
   f.session.dispose();
   assert.deepEqual(f.log, [
-    'demo-desk-001',
-    'demo-office-001',
-    'demo-floor-001',
-    'demo-building-001',
+    ...f.specs.map((s) => s.nodeId).reverse(),
     'collection',
   ]);
   assert.deepEqual(f.parent.children, [f.shared]);
@@ -129,17 +128,18 @@ test('hidden acquisition builds only four fixture boxes; release leaves shared r
   assert.deepEqual(f.renders, ['workspace-activate', 'workspace-dispose']);
 });
 
-test('partial geometry failure releases earlier acquisitions and collection', async () => {
-  const f = fixture({ failAt: 2 });
-  await assert.rejects(f.session.activate(), /box failed/);
-  assert.deepEqual(f.log, [
-    'demo-floor-001',
-    'demo-building-001',
-    'collection',
-  ]);
-  assert.deepEqual(f.parent.children, [f.shared]);
-  assert.equal(f.session.getState(), 'idle');
-});
+for (const failAt of [0, 2, 23, 33]) {
+  test(`partial geometry failure at part ${failAt} releases earlier acquisitions and collection`, async () => {
+    const f = fixture({ failAt });
+    await assert.rejects(f.session.activate(), /box failed/);
+    assert.deepEqual(f.log, [
+      ...f.specs.map((s) => s.nodeId).reverse(),
+      'collection',
+    ]);
+    assert.deepEqual(f.parent.children, [f.shared]);
+    assert.equal(f.session.getState(), 'idle');
+  });
+}
 
 test('failure while attaching the collection still releases its ownership', async () => {
   const f = fixture();
@@ -197,7 +197,7 @@ test('real Cesium CPU geometry constructors work without constructing a Viewer',
   });
   const session = createWorkspaceSession({ acquire: adapter.acquire });
   await session.activate();
-  assert.equal(parent.children[0].length, 4);
+  assert.equal(parent.children[0].length, 34);
   session.dispose();
   assert.equal(parent.children.length, 0);
 });
@@ -261,9 +261,14 @@ test('real instance model matrices map rotated box vertices through milestone 1 
     for (let i = 0; i < collection.length; i++) {
       const instance = collection.get(i).geometryInstances;
       const node = document.nodes.find((n) => n.id === instance.id);
-      const min = [...node.bounds.minM],
-        max = [...node.bounds.maxM];
-      if (node.kind === 'floor') max[2] = min[2] + 0.1;
+      const part =
+        workspaceBoxParts(node)[
+          Array.from({ length: i }, (_, j) => collection.get(j)).filter(
+            (p) => p.geometryInstances.id === node.id,
+          ).length
+        ];
+      const min = part.minM,
+        max = part.maxM;
       const center = min.map((v, axis) => (v + max[axis]) / 2);
       const geometry =
         instance.geometry instanceof BoxOutlineGeometry
@@ -325,7 +330,7 @@ for (const destroyPrimitives of [true, false]) {
     });
     session.dispose();
     session.dispose();
-    assert.deepEqual(releases, [3, 2, 1, 0]);
+    assert.deepEqual(releases, primitives.map((_, i) => i).reverse());
     assert.equal(owned.isDestroyed(), true);
     assert.ok(primitives.every((primitive) => primitive.isDestroyed()));
     assert.equal(parent.length, 1);

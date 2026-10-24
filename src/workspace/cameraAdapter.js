@@ -6,10 +6,10 @@ const vector = (v) => new Cartesian3(...v);
 
 /** Local presets, not geographic share poses. No global clearance changes. */
 const PRESETS = {
-  building: { eye: [0, -30, 30], target: [0, 0, 2] },
-  floor: { eye: [0, -10, 10], target: [0, 0, 0] },
-  office: { eye: [3, -2, 3], target: [3, 2.5, 1] },
-  desk: { eye: [0.8, -1.2, 1.5], target: [0.8, 0.4, 0.75] },
+  building: { eye: [26, -38, 26], target: [0, 0, 2] },
+  floor: { eye: [14, -21, 20], target: [0, 0, 0.5] },
+  office: { eye: [10, -9, 10], target: [3, 2.5, 1] },
+  desk: { eye: [3.1, -3.2, 2.5], target: [0.8, 0.4, 0.7] },
 };
 
 export function createWorkspaceCameraAdapter({

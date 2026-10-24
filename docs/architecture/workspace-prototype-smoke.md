@@ -38,11 +38,14 @@ height. It describes no real building or surveyed terrain.
    await workspace.activate(); // state "active", same existing viewer
    ```
 
-   Inspect a cyan building wireframe, gray floor slab, amber office wireframe,
-   and green desk. There is no opaque roof or application/widget geometry.
-   Appearance and desk-scale GPU precision need real browser verification.
+   Current geometry is the 34-part fictional cutaway described in the
+   [navigation smoke guide](workspace-navigation-smoke.md#issue-9-lightweight-fictional-cutaway).
+   There is no opaque roof or application/widget geometry. Use the opt-in
+   navigation methods in that guide for the four framed views. Geometry-only
+   activation does not move the camera.
+
 5. Run `workspace.deactivate()`. State returns to `idle`, the private collection
-   and its four primitives are destroyed, and `viewer.scene.primitives.length`
+   and its 34 primitives are destroyed, and `viewer.scene.primitives.length`
    returns to `before` (assuming no unrelated layer changed). Activate and
    deactivate 20 times; counts should not grow. Existing viewer, maps, layers,
    scene director, voice and controls must continue to work.
@@ -75,7 +78,7 @@ map stack and observed results when executing this manual procedure; no such
 measurements are implied by the procedure itself. Navigation authority,
 interior camera policies and interactive widgets remain future milestones.
 
-## PR #5 final validation observations
+## Historical PR #5 final validation observations (four-box version)
 
 Validated the existing prototype with installed Chromium 154 (headless), WebGL
 2.0, ANGLE/Vulkan SwiftShader software rendering, at 1280 × 900 and DPR 1.

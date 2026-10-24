@@ -1,3 +1,5 @@
+import { mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import puppeteer from 'puppeteer';
 import { chromeExecutablePath } from './qa-chrome.mjs';
 
@@ -10,6 +12,10 @@ const software = args.includes('--software');
 const shot = args.includes('--screenshot')
   ? args[args.indexOf('--screenshot') + 1]
   : null;
+const evidenceDir = args.includes('--evidence-dir')
+  ? args[args.indexOf('--evidence-dir') + 1]
+  : null;
+if (evidenceDir) await mkdir(evidenceDir, { recursive: true });
 const browser = await puppeteer.launch({
   executablePath: chromeExecutablePath(),
   headless: true,
@@ -55,7 +61,7 @@ try {
   );
   await page.keyboard.press('Escape');
   console.log('Browser ready; starting fixture route');
-  const desk = await page.evaluate(async () => {
+  await page.evaluate(async () => {
     const d = window.__godsEyeView,
       v = d.viewer,
       s = d.workspacePrototype;
@@ -88,9 +94,42 @@ try {
     );
     if (!(await s.enter()))
       throw Error('entry failed ' + JSON.stringify(s.getNavigationState()));
-    for (let i = 0; i < 3; i++)
-      if (!(await s.enterChild()))
-        throw Error('child failed ' + JSON.stringify(s.getNavigationState()));
+  });
+  const captures = [];
+  for (const scope of ['building', 'floor', 'office', 'desk']) {
+    if (scope !== 'building') {
+      if (
+        !(await page.evaluate(() =>
+          window.__godsEyeView.workspacePrototype.enterChild(),
+        ))
+      )
+        throw Error('child failed');
+    }
+    const state = await page.evaluate(() =>
+      window.__godsEyeView.workspacePrototype.getNavigationState(),
+    );
+    if (state.scopeId !== `demo-${scope}-001`)
+      throw Error('unexpected scope ' + JSON.stringify(state));
+    for (const width of evidenceDir ? [1280, 800] : [1280]) {
+      await page.setViewport({ width, height: 900, deviceScaleFactor: 1 });
+      await page.evaluate(async () => {
+        for (let i = 0; i < 4; i++) {
+          window.__godsEyeView.viewer.scene.requestRender();
+          await new Promise(requestAnimationFrame);
+        }
+      });
+      if (evidenceDir) {
+        const path = join(evidenceDir, `${scope}-${width}.png`);
+        await page.screenshot({ path });
+        captures.push({ scope: state.scopeId, width, path });
+      }
+    }
+  }
+  await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
+  const desk = await page.evaluate(async () => {
+    const d = window.__godsEyeView,
+      v = d.viewer,
+      s = d.workspacePrototype;
     if (s.getNavigationState().scopeId !== 'demo-desk-001')
       throw Error('not at desk');
     if (v.scene.screenSpaceCameraController.enableInputs !== false)
@@ -157,6 +196,29 @@ try {
         'settings not restored ' +
           JSON.stringify({ before: check.settings, after: settings() }),
       );
+    for (let i = 0; i < 20; i++) {
+      if (!(await s.enter()) || !(await s.exit()))
+        throw Error('cycle navigation failed ' + i);
+      if (v.scene.primitives.length !== check.count)
+        throw Error('cycle primitive leak ' + i);
+      if (JSON.stringify(settings()) !== JSON.stringify(check.settings))
+        throw Error('cycle settings leak ' + i);
+      const pose = check.capture();
+      if (
+        Math.hypot(
+          ...pose.position.map((n, axis) => n - after.position[axis]),
+        ) > 0.01 ||
+        angle(pose.direction, after.direction) > 0.1 ||
+        angle(pose.up, after.up) > 0.1
+      )
+        throw Error('cycle return precision ' + i);
+      if (
+        d
+          .getRenderGovernorDiagnostics()
+          .holds.some((h) => h.startsWith('workspace-flight-'))
+      )
+        throw Error('cycle hold leak ' + i);
+    }
     // Real shell generation handoff during a flight, not a fake coordinator.
     await s.enter();
     const pending = s.enterChild();
@@ -199,6 +261,7 @@ try {
     if (d.workspacePrototype !== undefined)
       throw Error('entry survives teardown');
     return {
+      cyclesWithoutLeaks: 20,
       distanceM: distance,
       orientationDeg: orientation,
       collectionCountRestored: true,
@@ -212,6 +275,7 @@ try {
   if (errors.length) throw Error('Browser page errors: ' + errors.join(';'));
   console.log(
     JSON.stringify({
+      captures,
       desk,
       result,
       pageErrors: errors,

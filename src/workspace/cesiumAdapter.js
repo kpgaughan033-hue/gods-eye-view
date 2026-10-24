@@ -11,6 +11,7 @@ import {
   Primitive,
   PrimitiveCollection,
 } from 'cesium';
+import { workspaceBoxParts } from './geometry.js';
 import { createCoordinateFrames } from './coordinates.js';
 import { validateSpatialDocument } from './spatialModel.js';
 
@@ -54,7 +55,7 @@ function createBox({
   });
 }
 
-/** Borrow the viewer; own only a private collection and four static primitives. */
+/** Borrow the viewer; own only a private collection and bounded static box primitives. */
 export function createCesiumWorkspaceAdapter({
   viewer,
   document,
@@ -69,30 +70,24 @@ export function createCesiumWorkspaceAdapter({
     .filter((node) =>
       ['building', 'floor', 'office', 'desk'].includes(node.kind),
     )
-    .map((node) => {
-      const min = [...node.bounds.minM],
-        max = [...node.bounds.maxM];
-      if (node.kind === 'floor')
-        max[2] = min[2] + Math.min(0.1, max[2] - min[2]);
-      const center = min.map((v, i) => (v + max[i]) / 2);
-      return {
+    .flatMap((node) =>
+      workspaceBoxParts(node).map(({ part, minM, maxM, color, outline }) => ({
         nodeId: node.id,
-        outline: node.kind === 'building' || node.kind === 'office',
-        dimensionsM: max.map((v, i) => v - min[i]),
-        centerEcef: frames.localToEcef(node.id, center),
+        part,
+        outline,
+        dimensionsM: maxM.map((v, i) => v - minM[i]),
+        centerEcef: frames.localToEcef(
+          node.id,
+          minM.map((v, i) => (v + maxM[i]) / 2),
+        ),
         axesEcef: [
           [1, 0, 0],
           [0, 1, 0],
           [0, 0, 1],
         ].map((axis) => frames.localDirectionToEcef(node.id, axis)),
-        color: {
-          building: '#00d4ff',
-          floor: '#42566b',
-          office: '#ffcc66',
-          desk: '#66ddaa',
-        }[node.kind],
-      };
-    });
+        color,
+      })),
+    );
   return Object.freeze({
     acquire({ signal, defer }) {
       signal.throwIfAborted();
