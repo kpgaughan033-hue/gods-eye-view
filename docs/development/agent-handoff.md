@@ -31,6 +31,10 @@ This repository already has GitHub Actions CI at `.github/workflows/ci.yml`. Pre
 
 For workspace milestones, inspect spatial identity and coordinate conventions; viewer and render-governor ownership; abort and stale-completion behavior; single camera authority and clearance rules; widget versus persistent-agent lifetimes; and any normal-startup behavior. Request real browser evidence for rendering/navigation changes. Tests using fakes are not substitutes for visual verification.
 
+## CI activation note
+
+If GitHub Actions is enabled on a fork after a PR was opened, existing PRs may show no checks. Push a new commit to the PR branch to trigger the existing pull_request workflow, then verify actual runs and results before merging.
+
 ## Suggested next milestone
 
 Milestone 3 is navigation and return transitions from globe to synthetic building/floor/office/desk and back. Treat camera authority, precision, cancellation, and restore behavior as an explicit approval gate before implementation.
