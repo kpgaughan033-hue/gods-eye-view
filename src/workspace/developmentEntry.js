@@ -108,11 +108,13 @@ export function installWorkspaceDevelopmentEntry({
   // A newer globe intent during the lazy import must invalidate that entry too.
   const unwatch = debug.styleManager?.subscribeCameraHandoff(() => {
     generation++;
+    navigation?.invalidateEntryPose?.();
   });
   if (unwatch) defer(unwatch);
   const canvas = viewer.scene?.canvas?.ownerDocument || viewer.scene?.canvas;
   const invalidateLazy = () => {
     generation++;
+    navigation?.invalidateEntryPose?.();
   };
   for (const event of ['pointerdown', 'wheel', 'touchstart', 'keydown'])
     canvas?.addEventListener(event, invalidateLazy, {

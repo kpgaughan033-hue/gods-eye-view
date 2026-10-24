@@ -45,7 +45,7 @@ export function createWorkspaceNavigation({
     old?.controller.abort();
     return old;
   }
-  function revoke() {
+  function revoke({ preserveEntryPose = false } = {}) {
     const owned = lease;
     lease = null;
     owned?.signal.removeEventListener('abort', revoke);
@@ -63,6 +63,7 @@ export function createWorkspaceNavigation({
       }
     }
     restoreSettings = null;
+    if (!preserveEntryPose) entryPose = null;
     returnPose = null;
     snapshot = null;
     history.clear();
@@ -97,11 +98,12 @@ export function createWorkspaceNavigation({
     return false;
   }
   async function goTo(targetId, overridePose) {
-    const firstPose = entryPose;
-    entryPose = null;
     if (disposed || !nodes.has(targetId) || !validTarget(targetId))
       return false;
-    if (targetId === root && !lease) return false;
+    if (targetId === root && !lease) {
+      entryPose = null;
+      return false;
+    }
     if (targetId !== root && !supported()) {
       // i18n-ignore: development-console diagnostic, not displayed in the UI.
       error = 'Unsupported map surface for fictional workspace';
@@ -111,7 +113,8 @@ export function createWorkspaceNavigation({
     const previous = cancelPending();
     error = null;
     if (!lease) {
-      const captured = firstPose || camera.capture();
+      const captured = entryPose || camera.capture();
+      entryPose = structuredClone(captured);
       const diagnostic = diagnostics();
       lease = claim();
       if (!lease?.isCurrent()) {
@@ -122,6 +125,9 @@ export function createWorkspaceNavigation({
         publish();
         return false;
       }
+      // A successful claim can publish its own handoff. Re-establish this
+      // candidate only after confirming the lease is still current.
+      entryPose = structuredClone(captured);
       returnPose = captured;
       snapshot = structuredClone(diagnostic);
       lease.signal.addEventListener('abort', revoke, { once: true });
@@ -129,7 +135,7 @@ export function createWorkspaceNavigation({
         restoreSettings = camera.constrain();
       } catch (failure) {
         error = failure.message;
-        revoke();
+        revoke({ preserveEntryPose: true });
         return false;
       }
     }
@@ -193,6 +199,7 @@ export function createWorkspaceNavigation({
         for (const id of history.keys())
           if (!ancestors.has(id)) history.delete(id);
         committed = targetId;
+        entryPose = null;
         pending = null;
         phase = 'stable';
         publish();
@@ -205,13 +212,13 @@ export function createWorkspaceNavigation({
         } catch (rollbackError) {
           // i18n-ignore: development-console diagnostic, not displayed in the UI.
           error = `${failure.message}; rollback failed: ${rollbackError.message}`;
-          revoke();
+          revoke({ preserveEntryPose: true });
           return false;
         }
         error = failure.message;
         pending = null;
         phase = committed === root ? 'idle' : 'stable';
-        if (committed === root) revoke();
+        if (committed === root) revoke({ preserveEntryPose: true });
         else publish();
         return false;
       }
@@ -244,6 +251,7 @@ export function createWorkspaceNavigation({
   }
   const removeInput = listenInput(() => {
     if (lease) revoke();
+    else entryPose = null;
   });
   signal?.addEventListener('abort', dispose, { once: true });
   if (signal?.aborted) dispose();
@@ -260,6 +268,9 @@ export function createWorkspaceNavigation({
     back,
     exit: () => goTo(root),
     revoke,
+    invalidateEntryPose: () => {
+      entryPose = null;
+    },
     dispose,
     getState: channel.getSnapshot,
     subscribe: channel.subscribe,

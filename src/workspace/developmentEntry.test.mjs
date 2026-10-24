@@ -5,8 +5,187 @@ import {
   workspacePrototypeEnabled,
 } from './developmentEntry.js';
 import { createApplication } from '../app/application.js';
+import { createWorkspaceNavigation } from './navigation.js';
+import { createWorkspaceCameraAdapter } from './cameraAdapter.js';
+import { createWorkspaceFixture } from './fixture.js';
+import { Cartesian3 } from 'cesium';
 
 const tick = () => new Promise((resolve) => setImmediate(resolve));
+
+for (const firstAttempt of [
+  'refused',
+  'unsupported',
+  'acquisition failure',
+  'flight failure',
+  'refused then handoff',
+  'refused then input',
+]) {
+  test(`retry after first entry ${firstAttempt} preserves the correct captured ECEF return (CPU simulation)`, async () => {
+    const original = {
+      position: [6378137.123456789, 1234.987654321, 56.123456789],
+      direction: [Math.cos(0.25), Math.sin(0.25), 0],
+      up: [0, 0, 1],
+    };
+    const drift = {
+      position: [6378167.123456789, 1244.987654321, 76.123456789],
+      direction: [-Math.sin(0.25), Math.cos(0.25), 0],
+      up: [0, 0, 1],
+    };
+    let fail = true,
+      handoff,
+      resolveModule;
+    const controller = new AbortController(),
+      cleanups = [],
+      canvas = new EventTarget();
+    const camera = {
+      positionWC: new Cartesian3(...original.position),
+      directionWC: new Cartesian3(...original.direction),
+      upWC: new Cartesian3(...original.up),
+      frustum: { near: 1 },
+      setView({ destination, orientation }) {
+        if (firstAttempt === 'flight failure' && fail) {
+          fail = false;
+          throw Error('first flight failed');
+        }
+        this.positionWC = destination;
+        this.directionWC = orientation.direction;
+        this.upWC = orientation.up;
+      },
+    };
+    const viewer = {
+      camera,
+      isDestroyed: () => false,
+      scene: {
+        canvas,
+        screenSpaceCameraController: {
+          enableInputs: true,
+          enableCollisionDetection: true,
+        },
+      },
+    };
+    const document = createWorkspaceFixture();
+    const module = {
+      createWorkspacePrototypeAdapter: () => ({
+        acquire() {
+          if (firstAttempt === 'acquisition failure' && fail) {
+            fail = false;
+            throw Error('first acquisition failed');
+          }
+          return { activate() {}, dispose() {} };
+        },
+      }),
+      createWorkspacePrototypeNavigation: ({ session, initialPose }) =>
+        createWorkspaceNavigation({
+          document,
+          session,
+          initialPose,
+          signal: controller.signal,
+          supported() {
+            if (firstAttempt === 'unsupported' && fail) {
+              fail = false;
+              return false;
+            }
+            return true;
+          },
+          camera: createWorkspaceCameraAdapter({
+            viewer,
+            document,
+            reducedMotion: () => true,
+            requestRender() {},
+            holdRender() {},
+            releaseRender() {},
+          }),
+          claim() {
+            if (firstAttempt.startsWith('refused') && fail) {
+              fail = false;
+              return null;
+            }
+            // The real owner's successful claim publishes a handoff of its own.
+            handoff?.();
+            const authority = new AbortController();
+            return {
+              signal: authority.signal,
+              isCurrent: () => !authority.signal.aborted,
+              release: () => authority.abort(),
+            };
+          },
+        }),
+    };
+    const entry = installWorkspaceDevelopmentEntry({
+      viewer,
+      signal: controller.signal,
+      debug: {
+        styleManager: {
+          subscribeCameraHandoff(fn) {
+            handoff = fn;
+            return () => {
+              handoff = null;
+            };
+          },
+        },
+      },
+      defer: (fn) => cleanups.push(fn),
+      load: () =>
+        new Promise((resolve) => {
+          resolveModule = resolve;
+        }),
+    });
+    try {
+      const pending = entry.enter();
+      // Simulate camera drift during lazy loading, without a new user intent.
+      camera.positionWC = new Cartesian3(...drift.position);
+      camera.directionWC = new Cartesian3(...drift.direction);
+      await tick();
+      resolveModule(module);
+      assert.equal(await pending, false);
+      // A genuine newer user intent invalidates the old candidate, unlike
+      // passive startup drift or a retry of the same refused/failed entry.
+      if (firstAttempt === 'refused then handoff') handoff();
+      if (firstAttempt === 'refused then input')
+        canvas.dispatchEvent(new Event('wheel'));
+      const expected = firstAttempt.includes(' then ') ? drift : original;
+      assert.equal(await entry.enter(), true);
+      assert.equal(await entry.exit(), true);
+      const positionError = Cartesian3.distance(
+        camera.positionWC,
+        new Cartesian3(...expected.position),
+      );
+      const angle = (actual, expected) =>
+        (Cartesian3.angleBetween(actual, new Cartesian3(...expected)) * 180) /
+        Math.PI;
+      const orientationError = Math.max(
+        angle(camera.directionWC, expected.direction),
+        angle(camera.upWC, expected.up),
+      );
+      assert.ok(
+        positionError <= 0.01,
+        `return position error ${positionError} m`,
+      );
+      assert.ok(
+        orientationError <= 0.1,
+        `return orientation error ${orientationError} degrees`,
+      );
+      // Once a cycle commits and exits, a new entry must capture a fresh pose.
+      const fresh = {
+        ...original,
+        position: drift.position.map((value) => value + 50),
+      };
+      camera.positionWC = new Cartesian3(...fresh.position);
+      camera.directionWC = new Cartesian3(...fresh.direction);
+      assert.equal(await entry.enter(), true);
+      assert.equal(await entry.exit(), true);
+      assert.ok(
+        Cartesian3.distance(
+          camera.positionWC,
+          new Cartesian3(...fresh.position),
+        ) <= 0.01,
+      );
+      assert.ok(angle(camera.directionWC, fresh.direction) <= 0.1);
+    } finally {
+      for (const cleanup of cleanups.reverse()) cleanup();
+    }
+  });
+}
 function fixture() {
   const log = [],
     cleanups = [];
