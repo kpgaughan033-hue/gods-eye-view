@@ -2947,5 +2947,20 @@
   "Layers": "Capas",
   "Search": "Buscar",
   "More": "Más",
-  "Panels": "Paneles"
+  "Panels": "Paneles",
+  "Workspace": "Espacio de trabajo",
+  "Open checklist": "Abrir lista de tareas",
+  "Back": "Atrás",
+  "Exit workspace": "Salir del espacio de trabajo",
+  "Task checklist": "Lista de tareas",
+  "Back to desk": "Volver al escritorio",
+  "New task": "Nueva tarea",
+  "Add task": "Añadir tarea",
+  "No tasks yet.": "Aún no hay tareas.",
+  "Tasks": "Tareas",
+  "Saved locally on this device.": "Guardado localmente en este dispositivo.",
+  "Storage unavailable. Changes last for this page only.": "Almacenamiento no disponible. Los cambios solo duran en esta página.",
+  "Delete task": "Eliminar tarea",
+  "Delete task: {task}": "Eliminar tarea: {task}",
+  "Use 1–240 characters, up to 100 tasks.": "Usa entre 1 y 240 caracteres, hasta 100 tareas."
 }

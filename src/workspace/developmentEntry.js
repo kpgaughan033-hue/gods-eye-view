@@ -16,6 +16,7 @@ export function installWorkspaceDevelopmentEntry({
   cancelStartupCamera,
   load = () => import('./prototype.js'),
 }) {
+  const screens = new Set();
   let pending = null,
     navigation = null,
     disposed = false,
@@ -32,10 +33,12 @@ export function installWorkspaceDevelopmentEntry({
     async acquire({ signal: acquisitionSignal, defer: own }) {
       const module = await loadModule();
       acquisitionSignal.throwIfAborted();
-      return module.createWorkspacePrototypeAdapter({ viewer }).acquire({
-        signal: acquisitionSignal,
-        defer: own,
-      });
+      return module
+        .createWorkspacePrototypeAdapter({ viewer, screens })
+        .acquire({
+          signal: acquisitionSignal,
+          defer: own,
+        });
     },
   });
   async function navigate(method, argument) {
@@ -70,6 +73,7 @@ export function installWorkspaceDevelopmentEntry({
       signal,
       cancelStartupCamera,
       initialPose,
+      screens,
     });
     return navigation[method](argument);
   }
@@ -112,7 +116,8 @@ export function installWorkspaceDevelopmentEntry({
   });
   if (unwatch) defer(unwatch);
   const canvas = viewer.scene?.canvas?.ownerDocument || viewer.scene?.canvas;
-  const invalidateLazy = () => {
+  const invalidateLazy = (event) => {
+    if (navigation?.ownsInput?.(event)) return;
     generation++;
     navigation?.invalidateEntryPose?.();
   };

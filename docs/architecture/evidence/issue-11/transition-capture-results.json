@@ -1,0 +1,9 @@
+{
+  "captures": ["transition-paused-1280.png", "transition-paused-800.png"],
+  "externalBrowserRequests": "blocked",
+  "providerApiRequests": "blocked",
+  "softwareRequested": true,
+  "visualOnly": true,
+  "midTransitionPaused": [1280, 800],
+  "pageErrors": []
+}

@@ -102,6 +102,8 @@ export function isEditingSpaceTarget(target) {
 /** Protects text entry and modified shortcuts from push-to-talk arbitration. */
 export function shouldHandlePushToTalkKeyDown(event) {
   if (!isPushToTalkKey(event) || event.defaultPrevented) return false;
+  // The development workspace's accessible surface owns Space on all controls.
+  if (event.target?.closest?.('[data-workspace-input]')) return false;
   if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
     return false;
   return !isEditingSpaceTarget(event.target);

@@ -1,3 +1,11 @@
+// The sole interactive surface; local desk metres, front face toward -Y.
+export const MONITOR_SCREEN = Object.freeze({
+  minM: Object.freeze([0.49, 0.55, 0.98]),
+  maxM: Object.freeze([1.11, 0.555, 1.34]),
+});
+export const screenPickId = (document) =>
+  `${document.workspaceId}:${document.nodes.find((node) => node.kind === 'desk').id}:screen`;
+
 /**
  * Static cutaway presentation, not spatial identity or surveyed architecture.
  * Dimensions are metres in each fixture node's local frame. Open south faces
@@ -74,7 +82,7 @@ export function workspaceBoxParts(node) {
     box('monitor-base', [0.62, 0.43, 0.75], [0.98, 0.69, 0.78], '#33475b');
     box('monitor-stand', [0.77, 0.55, 0.78], [0.83, 0.61, 0.96], '#33475b');
     box('monitor', [0.45, 0.56, 0.94], [1.15, 0.64, 1.38], '#24394e');
-    box('screen', [0.49, 0.55, 0.98], [1.11, 0.555, 1.34], '#79c4d6');
+    box('screen', MONITOR_SCREEN.minM, MONITOR_SCREEN.maxM, '#79c4d6');
     box('keyboard', [0.48, 0.14, 0.75], [1.12, 0.34, 0.78], '#d5dee5');
   }
   return parts;

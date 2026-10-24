@@ -1,0 +1,23 @@
+{
+  "captures": [],
+  "desk": {
+    "scope": "demo-desk-001",
+    "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "map": "osm"
+  },
+  "result": {
+    "cyclesWithoutLeaks": 20,
+    "distanceM": 0,
+    "orientationDeg": 0,
+    "collectionCountRestored": true,
+    "cameraSettingsRestored": true,
+    "searchHandoff": true,
+    "manualHandoff": true,
+    "teardown": true,
+    "sceneErrors": []
+  },
+  "pageErrors": [],
+  "externalBrowserRequests": "blocked",
+  "providerApiRequests": "blocked",
+  "softwareRequested": true
+}

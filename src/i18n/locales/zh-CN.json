@@ -2813,5 +2813,20 @@
   "Layers": "图层",
   "Search": "搜索",
   "More": "更多",
-  "Panels": "面板"
+  "Panels": "面板",
+  "Workspace": "工作空间",
+  "Open checklist": "打开任务清单",
+  "Back": "返回",
+  "Exit workspace": "退出工作空间",
+  "Task checklist": "任务清单",
+  "Back to desk": "返回书桌",
+  "New task": "新任务",
+  "Add task": "添加任务",
+  "No tasks yet.": "暂无任务。",
+  "Tasks": "任务",
+  "Saved locally on this device.": "已保存在此设备上。",
+  "Storage unavailable. Changes last for this page only.": "存储不可用。更改仅在当前页面有效。",
+  "Delete task": "删除任务",
+  "Delete task: {task}": "删除任务：{task}",
+  "Use 1–240 characters, up to 100 tasks.": "请输入 1–240 个字符，最多 100 项任务。"
 }

@@ -3014,5 +3014,20 @@
   "Layers": "Слои",
   "Search": "Поиск",
   "More": "Ещё",
-  "Panels": "Панели"
+  "Panels": "Панели",
+  "Workspace": "Рабочее пространство",
+  "Open checklist": "Открыть список задач",
+  "Back": "Назад",
+  "Exit workspace": "Выйти из рабочего пространства",
+  "Task checklist": "Список задач",
+  "Back to desk": "Вернуться к столу",
+  "New task": "Новая задача",
+  "Add task": "Добавить задачу",
+  "No tasks yet.": "Задач пока нет.",
+  "Tasks": "Задачи",
+  "Saved locally on this device.": "Сохранено локально на этом устройстве.",
+  "Storage unavailable. Changes last for this page only.": "Хранилище недоступно. Изменения сохраняются только на время работы страницы.",
+  "Delete task": "Удалить задачу",
+  "Delete task: {task}": "Удалить задачу: {task}",
+  "Use 1–240 characters, up to 100 tasks.": "От 1 до 240 символов, не более 100 задач."
 }

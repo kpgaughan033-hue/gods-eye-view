@@ -1,4 +1,5 @@
 import { Cartesian3, Matrix4 } from 'cesium';
+import { MONITOR_SCREEN } from './geometry.js';
 import { createCoordinateFrames } from './coordinates.js';
 
 const plain = (v) => [v.x, v.y, v.z];
@@ -43,15 +44,26 @@ export function createWorkspaceCameraAdapter({
     return true;
   }
   function pose(node) {
-    const preset = PRESETS[node.kind];
+    // Application metadata remains unchanged. The camera approaches the actual
+    // monitor front in the parent desk frame, not the logical widget bounds.
+    const screen = MONITOR_SCREEN;
+    const center = screen.minM.map((v, i) => (v + screen.maxM[i]) / 2);
+    const preset =
+      node.kind === 'application'
+        ? {
+            eye: [center[0], center[1] - 0.71, center[2]],
+            target: [center[0], screen.minM[1], center[2]],
+          }
+        : PRESETS[node.kind];
+    const frameId = node.kind === 'application' ? node.parentId : node.id;
     if (!preset) throw new TypeError('No workspace camera preset');
-    const position = frames.localToEcef(node.id, preset.eye);
-    const target = frames.localToEcef(node.id, preset.target);
+    const position = frames.localToEcef(frameId, preset.eye);
+    const target = frames.localToEcef(frameId, preset.target);
     const direction = Cartesian3.normalize(
       Cartesian3.subtract(vector(target), vector(position), new Cartesian3()),
       new Cartesian3(),
     );
-    const vertical = vector(frames.localDirectionToEcef(node.id, [0, 0, 1]));
+    const vertical = vector(frames.localDirectionToEcef(frameId, [0, 0, 1]));
     const right = Cartesian3.normalize(
       Cartesian3.cross(direction, vertical, new Cartesian3()),
       new Cartesian3(),

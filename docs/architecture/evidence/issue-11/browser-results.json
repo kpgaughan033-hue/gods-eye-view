@@ -1,0 +1,43 @@
+{
+  "captures": [
+    "desk-1280.png",
+    "checklist-1280.png",
+    "desk-800.png",
+    "checklist-800.png"
+  ],
+  "externalBrowserRequests": "blocked",
+  "providerApiRequests": "blocked",
+  "softwareRequested": true,
+  "screenAlignment": {
+    "800": {
+      "outlineErrorPx": 1.7877474154351775e-7,
+      "projectionErrorPx": 1.7877474154351775e-7
+    },
+    "1280": {
+      "outlineErrorPx": 2.542574607691763e-7,
+      "projectionErrorPx": 2.542574607691763e-7
+    }
+  },
+  "cycles": 20,
+  "return": {
+    "distanceM": 0,
+    "orientationDeg": 0,
+    "sceneErrors": []
+  },
+  "pickMiss": ["desktop", "monitor-frame", "surrounding-scene"],
+  "beforeReloadSceneErrors": [],
+  "cancellation": {
+    "back": true,
+    "exit": true,
+    "searchHandoff": true,
+    "outsideInput": true
+  },
+  "reloadPersistence": true,
+  "final": {
+    "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "sceneErrors": [],
+    "destroyed": true
+  },
+  "midTransitionPaused": [],
+  "pageErrors": []
+}

@@ -12,6 +12,7 @@ export function createWorkspaceNavigation({
   listenInput = () => () => {},
   signal,
   initialPose,
+  presentation = {},
 }) {
   validateSpatialDocument(document);
   const nodes = new Map(document.nodes.map((node) => [node.id, node]));
@@ -87,7 +88,8 @@ export function createWorkspaceNavigation({
     if (target === committed) return true;
     if (
       nodes.get(target)?.parentId === committed &&
-      nodes.get(target)?.kind !== 'application'
+      (nodes.get(target)?.kind !== 'application' ||
+        nodes.get(target)?.widget?.type === 'task-checklist')
     )
       return true;
     let cursor = nodes.get(committed);
@@ -175,12 +177,24 @@ export function createWorkspaceNavigation({
             : history.get(targetId) || camera.pose(nodes.get(targetId)));
         phase = 'moving';
         publish();
+        if (!current()) return false;
+        const visual = presentation.transition?.({
+          from: nodes.get(committed),
+          to: nodes.get(targetId),
+          destination,
+          signal: run.controller.signal,
+          current,
+        });
         const moved = await camera.move(destination, {
           signal: run.controller.signal,
           current,
         });
         if (!current()) return false;
         if (!moved) throw Error('Workspace flight cancelled or timed out');
+        const presented = await visual;
+        if (!current()) return false;
+        if (presented === false)
+          throw Error('Workspace presentation cancelled');
         phase = 'settling';
         publish();
         if (!current()) return false;
@@ -260,7 +274,10 @@ export function createWorkspaceNavigation({
       goTo(document.nodes.find((node) => node.kind === 'building').id),
     enterChild: () => {
       const child = document.nodes.find(
-        (node) => node.parentId === committed && node.kind !== 'application',
+        (node) =>
+          node.parentId === committed &&
+          (node.kind !== 'application' ||
+            node.widget?.type === 'task-checklist'),
       );
       return child ? goTo(child.id) : Promise.resolve(false);
     },
@@ -272,6 +289,7 @@ export function createWorkspaceNavigation({
       entryPose = null;
     },
     dispose,
+    ownsInput: (event) => presentation.ownsInput?.(event) === true,
     getState: channel.getSnapshot,
     subscribe: channel.subscribe,
   });

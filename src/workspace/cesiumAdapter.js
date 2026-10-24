@@ -11,12 +11,13 @@ import {
   Primitive,
   PrimitiveCollection,
 } from 'cesium';
-import { workspaceBoxParts } from './geometry.js';
+import { workspaceBoxParts, screenPickId } from './geometry.js';
 import { createCoordinateFrames } from './coordinates.js';
 import { validateSpatialDocument } from './spatialModel.js';
 
 function createBox({
   nodeId,
+  pickId,
   outline,
   dimensionsM,
   centerEcef,
@@ -37,7 +38,7 @@ function createBox({
       });
   return new Primitive({
     geometryInstances: new GeometryInstance({
-      id: nodeId,
+      id: pickId || nodeId,
       geometry,
       modelMatrix,
       attributes: {
@@ -51,7 +52,7 @@ function createBox({
       translucent: false,
     }),
     asynchronous: false,
-    allowPicking: false,
+    allowPicking: Boolean(pickId),
   });
 }
 
@@ -60,6 +61,7 @@ export function createCesiumWorkspaceAdapter({
   viewer,
   document,
   requestRender,
+  screens = new Set(),
   createCollection = () => new PrimitiveCollection(),
   createPrimitive = createBox,
 }) {
@@ -74,6 +76,10 @@ export function createCesiumWorkspaceAdapter({
       workspaceBoxParts(node).map(({ part, minM, maxM, color, outline }) => ({
         nodeId: node.id,
         part,
+        pickId:
+          node.kind === 'desk' && part === 'screen'
+            ? screenPickId(document)
+            : null,
         outline,
         dimensionsM: maxM.map((v, i) => v - minM[i]),
         centerEcef: frames.localToEcef(
@@ -126,6 +132,7 @@ export function createCesiumWorkspaceAdapter({
         signal.throwIfAborted();
         const primitive = createPrimitive(box);
         defer(() => {
+          screens.delete(primitive);
           if (!primitive.isDestroyed()) {
             try {
               if (!collection.isDestroyed()) collection.remove(primitive);
@@ -135,6 +142,7 @@ export function createCesiumWorkspaceAdapter({
           }
         });
         signal.throwIfAborted();
+        if (box.pickId) screens.add(primitive);
         collection.add(primitive);
       }
       return {
