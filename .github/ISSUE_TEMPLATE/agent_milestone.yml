@@ -1,0 +1,58 @@
+name: "Agent implementation milestone"
+description: "A bounded, approved task for Codex or another coding agent"
+title: "milestone: "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This issue is a specification, not authorization to merge. Read AGENTS.md and the linked architecture docs before editing.
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome and user-visible acceptance
+      description: What must be true when this milestone is complete?
+      placeholder: "Describe the smallest observable outcome."
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Repository context and references
+      description: Link relevant docs, modules, tests, and previous PRs.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: In scope
+      description: List concrete changes and integration seams.
+    validations:
+      required: true
+  - type: textarea
+    id: exclusions
+    attributes:
+      label: Out of scope and safety constraints
+      description: Explicitly prohibit unrelated changes, secrets, costs, and behavior changes.
+    validations:
+      required: true
+  - type: textarea
+    id: checks
+    attributes:
+      label: Validation and evidence
+      description: Targeted tests, existing CI, browser/GPU requirements, and known unverified areas.
+    validations:
+      required: true
+  - type: textarea
+    id: handoff
+    attributes:
+      label: Agent handoff and approval gate
+      value: |
+        Start from latest main; use a task-specific branch.
+        Read AGENTS.md and this issue before implementation.
+        Create a PR targeting main and link this issue; never merge the PR yourself.
+        Report checks actually run, failures, limitations, and manual validation.
+        If PR creation is forbidden, push the branch and provide a compare/create-PR link.
+        Wait for an explicit review decision before merging.
+    validations:
+      required: true
