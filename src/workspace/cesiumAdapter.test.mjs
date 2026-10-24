@@ -3,6 +3,15 @@ import assert from 'node:assert/strict';
 import { createCesiumWorkspaceAdapter } from './cesiumAdapter.js';
 import { createWorkspaceFixture } from './fixture.js';
 import { createWorkspaceSession } from './session.js';
+import { createCoordinateFrames } from './coordinates.js';
+import {
+  BoxGeometry,
+  BoxOutlineGeometry,
+  Cartesian3,
+  Matrix4,
+  PrimitiveCollection,
+  PrimitiveType,
+} from 'cesium';
 import {
   installRenderGovernor,
   uninstallRenderGovernor,
@@ -192,6 +201,141 @@ test('real Cesium CPU geometry constructors work without constructing a Viewer',
   session.dispose();
   assert.equal(parent.children.length, 0);
 });
+
+test('outline geometry attributes match the flat position-only appearance', async () => {
+  const parent = new PrimitiveCollection();
+  const viewer = { isDestroyed: () => false, scene: { primitives: parent } };
+  const adapter = createCesiumWorkspaceAdapter({
+    viewer,
+    document: createWorkspaceFixture(),
+    requestRender() {},
+  });
+  const session = createWorkspaceSession({ acquire: adapter.acquire });
+  try {
+    await session.acquire();
+    const collection = parent.get(0);
+    for (let i = 0; i < collection.length; i++) {
+      const primitive = collection.get(i);
+      const instance = primitive.geometryInstances;
+      const outline = instance.geometry instanceof BoxOutlineGeometry;
+      const geometry = outline
+        ? BoxOutlineGeometry.createGeometry(instance.geometry)
+        : BoxGeometry.createGeometry(instance.geometry);
+      assert.equal(primitive.appearance.flat, true);
+      assert.equal(primitive.appearance.vertexFormat.position, true);
+      assert.equal(primitive.appearance.vertexFormat.normal, false);
+      assert.ok(geometry.attributes.position);
+      if (outline) {
+        assert.equal(geometry.attributes.normal, undefined);
+        assert.equal(geometry.primitiveType, PrimitiveType.LINES);
+      } else assert.equal(geometry.primitiveType, PrimitiveType.TRIANGLES);
+      assert.equal(instance.attributes.color.value.length, 4);
+    }
+  } finally {
+    session.dispose();
+    parent.destroy();
+  }
+});
+
+test('real instance model matrices map rotated box vertices through milestone 1 frames', async () => {
+  const document = createWorkspaceFixture();
+  document.nodes[1].transform.rotationXYZW = [0, 0, Math.SQRT1_2, Math.SQRT1_2];
+  document.nodes[3].transform.rotationXYZW = [
+    Math.sin(0.3),
+    0,
+    0,
+    Math.cos(0.3),
+  ];
+  const frames = createCoordinateFrames(document);
+  const parent = new PrimitiveCollection();
+  const viewer = { isDestroyed: () => false, scene: { primitives: parent } };
+  const adapter = createCesiumWorkspaceAdapter({
+    viewer,
+    document,
+    requestRender() {},
+  });
+  const session = createWorkspaceSession({ acquire: adapter.acquire });
+  try {
+    await session.acquire();
+    const collection = parent.get(0);
+    for (let i = 0; i < collection.length; i++) {
+      const instance = collection.get(i).geometryInstances;
+      const node = document.nodes.find((n) => n.id === instance.id);
+      const min = [...node.bounds.minM],
+        max = [...node.bounds.maxM];
+      if (node.kind === 'floor') max[2] = min[2] + 0.1;
+      const center = min.map((v, axis) => (v + max[axis]) / 2);
+      const geometry =
+        instance.geometry instanceof BoxOutlineGeometry
+          ? BoxOutlineGeometry.createGeometry(instance.geometry)
+          : BoxGeometry.createGeometry(instance.geometry);
+      const positions = geometry.attributes.position.values;
+      for (let j = 0; j < positions.length; j += 3) {
+        const vertex = Array.from(positions.slice(j, j + 3));
+        const local = vertex.map((v, axis) => v + center[axis]);
+        for (let axis = 0; axis < 3; axis++)
+          assert.ok(
+            Math.min(
+              Math.abs(local[axis] - min[axis]),
+              Math.abs(local[axis] - max[axis]),
+            ) < 1e-10,
+          );
+        const expected = frames.localToEcef(node.id, local);
+        const actual = Matrix4.multiplyByPoint(
+          instance.modelMatrix,
+          new Cartesian3(...vertex),
+          new Cartesian3(),
+        );
+        assert.ok(
+          Math.hypot(
+            actual.x - expected[0],
+            actual.y - expected[1],
+            actual.z - expected[2],
+          ) < 1e-6,
+        );
+      }
+    }
+  } finally {
+    session.dispose();
+    parent.destroy();
+  }
+});
+
+for (const destroyPrimitives of [true, false]) {
+  test(`real private collection cleanup preserves shared siblings (parent destroyPrimitives=${destroyPrimitives})`, async () => {
+    const parent = new PrimitiveCollection({ destroyPrimitives });
+    const sibling = parent.add(new PrimitiveCollection());
+    const viewer = { isDestroyed: () => false, scene: { primitives: parent } };
+    const adapter = createCesiumWorkspaceAdapter({
+      viewer,
+      document: createWorkspaceFixture(),
+      requestRender() {},
+    });
+    const session = createWorkspaceSession({ acquire: adapter.acquire });
+    await session.acquire();
+    const owned = parent.get(1),
+      primitives = Array.from({ length: owned.length }, (_, i) => owned.get(i));
+    const releases = [];
+    primitives.forEach((primitive, i) => {
+      const destroy = primitive.destroy.bind(primitive);
+      primitive.destroy = () => {
+        releases.push(i);
+        return destroy();
+      };
+    });
+    session.dispose();
+    session.dispose();
+    assert.deepEqual(releases, [3, 2, 1, 0]);
+    assert.equal(owned.isDestroyed(), true);
+    assert.ok(primitives.every((primitive) => primitive.isDestroyed()));
+    assert.equal(parent.length, 1);
+    assert.equal(parent.get(0), sibling);
+    assert.equal(sibling.isDestroyed(), false);
+    parent.remove(sibling);
+    if (!sibling.isDestroyed()) sibling.destroy();
+    parent.destroy();
+  });
+}
 
 test('static prototype one-shot requests preserve unrelated render holds', async () => {
   const f = fixture();

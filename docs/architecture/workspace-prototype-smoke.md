@@ -70,3 +70,47 @@ precision, frame times or live-provider behavior. Record browser, GPU, viewport,
 map stack and observed results when executing this manual procedure; no such
 measurements are implied by the procedure itself. Navigation authority,
 interior camera policies and interactive widgets remain future milestones.
+
+## PR #5 final validation observations
+
+Validated the existing prototype with installed Chromium 154 (headless), WebGL
+2.0, ANGLE/Vulkan SwiftShader software rendering, at 1280 × 900 and DPR 1.
+External browser requests were blocked: the app automatically fell back from
+Esri to OSM without loaded imagery. No claim of live-map correctness follows.
+The test harness positioned the existing camera using milestone 1 coordinate
+frames after the normal startup flight settled; the prototype itself never
+changed the camera. This is an automated equivalent of the developer-console
+steps above, not a test of the location-search UI or future workspace navigation.
+
+Observed:
+
+- Default development startup had no workspace entry; opted-in startup was idle.
+- Hidden acquisition created one private collection with four primitives.
+  Activation made all four primitives ready, with zero scene render errors.
+- The captured image was inspected: cyan building and amber office wireframes,
+  gray floor slab and green desk were visible in the existing application UI.
+  The image's untextured/bright background is not a validated basemap.
+- Viewer identity and camera position were unchanged by activation. Twenty
+  activation/deactivation cycles restored collection counts and preserved an
+  unrelated render-governor hold. Cancellation, final disposal and application
+  teardown passed. Production preview ignored the development query flag.
+
+Source review of the installed Cesium SDK confirmed that `flat: true` selects
+`PerInstanceColorAppearance.FLAT_VERTEX_FORMAT` (position only), compatible with
+`BoxOutlineGeometry`'s position-only line geometry. Normals on solid boxes are
+allowed but unnecessary for flat shading; this is not a rendering defect.
+Real-geometry tests check appearance attributes and primitive types, and compare
+every box vertex transformed through the actual instance model matrix against
+milestone 1 coordinate frames with rotated building and office ancestors.
+Real `PrimitiveCollection` tests verify reverse-order, exactly-once primitive
+destruction and sibling preservation with parent `destroyPrimitives` both true
+and false. No source-confirmed production rendering defect was found, so this
+validation follow-up changes tests and documentation only.
+
+Executed: `node --test src/workspace/*.test.mjs src/app/application.test.mjs
+src/renderGovernor.test.mjs` (115 passed, zero failed/skipped), `npm run doctor
+-- --json`, `npm run build` (existing large-chunk warning), formatting and
+boundary checks, and development/production browser smoke harnesses. The
+harnesses and screenshot were temporary validation artifacts outside the
+repository. Hardware-GPU performance, cross-device visual quality, live-provider
+behavior and the full unit suite were not tested in this pass.
