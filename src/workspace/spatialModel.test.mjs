@@ -128,7 +128,17 @@ const invalid = [
       n.id = 'another-root';
       d.nodes.push(n);
     },
-    /disconnected/,
+    /expected exactly one globe/,
+  ],
+  [
+    'parented extra globe',
+    (d) => {
+      const n = structuredClone(d.nodes[0]);
+      n.id = 'parented-globe';
+      n.parentId = d.nodes[1].id;
+      d.nodes.push(n);
+    },
+    /expected exactly one globe/,
   ],
   [
     'skipped level',

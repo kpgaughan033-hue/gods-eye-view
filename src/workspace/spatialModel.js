@@ -161,6 +161,8 @@ export function validateSpatialDocument(document) {
   const root = nodes.get(document.rootId);
   if (!root || root.kind !== 'globe' || root.parentId !== null)
     fail('document.rootId', 'expected the parentless globe');
+  if ([...nodes.values()].filter((node) => node.kind === 'globe').length !== 1)
+    fail('document.nodes', 'expected exactly one globe');
   if (
     [...nodes.values()].filter((node) => node.kind === 'building').length !== 1
   )
