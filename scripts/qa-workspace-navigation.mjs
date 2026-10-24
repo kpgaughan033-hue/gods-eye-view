@@ -32,7 +32,9 @@ try {
   await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
   await page.setRequestInterception(true);
   page.on('request', (r) =>
-    r.url().startsWith(base.origin + '/') || /^(data:|blob:)/.test(r.url())
+    (r.url().startsWith(base.origin + '/') &&
+      !new URL(r.url()).pathname.startsWith('/api/')) ||
+    /^(data:|blob:)/.test(r.url())
       ? r.continue()
       : r.abort(),
   );
@@ -44,7 +46,7 @@ try {
   });
   if (await page.evaluate(() => !!window.__godsEyeView.workspacePrototype))
     throw Error('default entry present');
-  await page.goto(new URL('/?workspacePrototype=1', base).href, {
+  await page.goto(new URL('/?workspacePrototype=1&welcome=0', base).href, {
     waitUntil: 'domcontentloaded',
   });
   await page.waitForFunction(() => window.__godsEyeView?.workspacePrototype, {
@@ -280,6 +282,7 @@ try {
       result,
       pageErrors: errors,
       externalBrowserRequests: 'blocked',
+      providerApiRequests: 'blocked',
       softwareRequested: software,
     }),
   );

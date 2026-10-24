@@ -7,13 +7,15 @@ import {
 } from '../renderGovernor.js';
 import { createWorkspaceNavigation } from './navigation.js';
 import { createWorkspaceCameraAdapter } from './cameraAdapter.js';
+import { createWorkspaceUi } from './ui.js';
 import { Cartographic } from 'cesium';
 
 /** Called only by the explicit development entry; borrows the existing viewer. */
-export function createWorkspacePrototypeAdapter({ viewer }) {
+export function createWorkspacePrototypeAdapter({ viewer, screens }) {
   // Static geometry needs one-shot renders, never a continuous-render hold.
   return createCesiumWorkspaceAdapter({
     viewer,
+    screens,
     document: createWorkspaceFixture(),
     requestRender: governorRequestRender,
   });
@@ -26,6 +28,7 @@ export function createWorkspacePrototypeNavigation({
   signal,
   cancelStartupCamera,
   initialPose,
+  screens = new Set(),
 }) {
   const document = createWorkspaceFixture();
   const directorBusy = () =>
@@ -50,7 +53,12 @@ export function createWorkspacePrototypeNavigation({
     );
     return !Number.isFinite(ground) || ground < anchor.ellipsoidalHeightM;
   };
+  let ui = null;
   const owner = createWorkspaceNavigation({
+    presentation: {
+      transition: (context) => ui?.transition(context),
+      ownsInput: (event) => ui?.ownsInput(event),
+    },
     document,
     session,
     signal,
@@ -81,16 +89,43 @@ export function createWorkspacePrototypeNavigation({
       // not only the canvas. This listener is instance-owned and development-only.
       const canvas = viewer.scene.canvas.ownerDocument || viewer.scene.canvas;
       const events = ['pointerdown', 'touchstart', 'wheel', 'keydown'];
+      const onInput = (event) => {
+        if (!ui?.ownsInput(event)) listener(event);
+      };
       for (const event of events)
-        canvas.addEventListener(event, listener, {
+        canvas.addEventListener(event, onInput, {
           capture: true,
           passive: true,
         });
       return () => {
         for (const event of events)
-          canvas.removeEventListener(event, listener, true);
+          canvas.removeEventListener(event, onInput, true);
       };
     },
   });
-  return owner;
+  if (viewer.scene.canvas.ownerDocument?.createElement) {
+    try {
+      ui = createWorkspaceUi({
+        requestRender: governorRequestRender,
+        viewer,
+        document,
+        navigation: owner,
+        screens,
+        signal,
+      });
+    } catch (error) {
+      owner.dispose();
+      throw error;
+    }
+  }
+  return Object.freeze({
+    ...owner,
+    dispose() {
+      try {
+        owner.dispose();
+      } finally {
+        ui?.dispose();
+      }
+    },
+  });
 }

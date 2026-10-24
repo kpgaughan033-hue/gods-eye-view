@@ -14,7 +14,7 @@ const deferred = () => {
   });
   return { promise, resolve };
 };
-function fixture({ initialPose } = {}) {
+function fixture({ initialPose, presentation } = {}) {
   const document = createWorkspaceFixture(),
     writes = [],
     controller = new AbortController();
@@ -90,6 +90,7 @@ function fixture({ initialPose } = {}) {
   const diagnostic = { map: 'osm', layers: [{ id: 'flights', enabled: true }] };
   const owner = createWorkspaceNavigation({
     document,
+    presentation,
     initialPose,
     session: {
       activate: () => session.activate(),
@@ -150,7 +151,13 @@ test('full CPU-simulated route and semantic parents return the unrounded capture
     assert.equal(f.owner.getState().scopeId, id);
     assert.ok(f.owner.getState().ancestors.length <= 4);
   }
-  assert.equal(await f.owner.enterChild(), false); // no widget/application scope
+  const deskPose = structuredClone(f.actual());
+  assert.equal(await f.owner.enterChild(), true);
+  assert.equal(f.owner.getState().scopeId, 'demo-application-001');
+  assert.equal(await f.owner.enterChild(), false);
+  assert.equal(await f.owner.back(), true);
+  assert.deepEqual(f.actual(), deskPose);
+  assert.equal(f.owner.getState().scopeId, f.ids[4]);
   assert.equal(await f.owner.back(), true);
   assert.equal(f.owner.getState().scopeId, f.ids[3]);
   assert.equal(await f.owner.goTo(f.ids[1]), true); // ancestor breadcrumb
@@ -363,5 +370,87 @@ test('cleanup failure still releases lease and restores settings before reportin
   assert.equal(successor.isCurrent(), true);
   successor.release();
   f.failCleanup(false);
+  f.owner.dispose();
+});
+
+for (const action of ['back', 'exit', 'manual', 'authority', 'destroy']) {
+  test(`application visual settlement cancelled by ${action}; late arrival cannot commit or write`, async () => {
+    const gate = deferred();
+    let context;
+    const f = fixture({
+      presentation: {
+        transition(c) {
+          if (c.to.kind === 'application') {
+            context = c;
+            return gate.promise;
+          }
+        },
+      },
+    });
+    for (const id of f.ids.slice(1)) await f.owner.goTo(id);
+    const deskPose = structuredClone(f.actual());
+    const entering = f.owner.enterChild();
+    await tick();
+    assert.equal(f.owner.getState().scopeId, 'demo-desk-001');
+    assert.equal(f.owner.getState().targetId, 'demo-application-001');
+    let next;
+    if (action === 'back') next = f.owner.back();
+    if (action === 'exit') next = f.owner.exit();
+    if (action === 'manual') f.input();
+    if (action === 'authority')
+      f.navigation._beginDeferredNavigation('location');
+    if (action === 'destroy') f.owner.dispose();
+    assert.equal(await entering, false);
+    await next;
+    assert.equal(context.signal.aborted, true);
+    const writes = f.writes.length,
+      scope = f.owner.getState().scopeId;
+    gate.resolve(true);
+    await tick();
+    assert.equal(f.writes.length, writes);
+    assert.equal(f.owner.getState().scopeId, scope);
+    if (action === 'back') {
+      assert.deepEqual(f.actual(), deskPose);
+      assert.equal(scope, 'demo-desk-001');
+      await f.owner.exit();
+    }
+    if (action === 'exit') assert.deepEqual(f.actual(), f.original);
+    f.owner.dispose();
+    assert.equal(f.resources(), 0);
+    assert.equal(f.settings(), 0);
+  });
+}
+test('application parent history returns exactly to desk then office, floor, building and original globe', async () => {
+  const f = fixture();
+  for (const id of f.ids.slice(1)) await f.owner.goTo(id);
+  const deskPose = structuredClone(f.actual());
+  await f.owner.enterChild();
+  assert.deepEqual(f.owner.getState().ancestors, f.ids);
+  await f.owner.back();
+  assert.deepEqual(f.actual(), deskPose);
+  for (const id of [...f.ids].slice(0, -1).reverse()) {
+    assert.equal(await f.owner.back(), true);
+    assert.equal(f.owner.getState().scopeId, id);
+  }
+  assert.deepEqual(f.actual(), f.original);
+  f.owner.dispose();
+});
+test('reentrant camera takeover at moving publication cannot start any application presentation', async () => {
+  let appTransitions = 0;
+  const f = fixture({
+    presentation: {
+      transition({ to }) {
+        if (to.kind === 'application') appTransitions++;
+      },
+    },
+  });
+  for (const id of f.ids.slice(1)) await f.owner.goTo(id);
+  const stop = f.owner.subscribe(({ state }) => {
+    if (state.phase === 'moving' && state.targetId === 'demo-application-001')
+      f.input();
+  });
+  assert.equal(await f.owner.enterChild(), false);
+  assert.equal(appTransitions, 0);
+  stop();
   f.owner.dispose();
 });

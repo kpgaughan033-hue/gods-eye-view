@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createCesiumWorkspaceAdapter } from './cesiumAdapter.js';
-import { workspaceBoxParts } from './geometry.js';
+import { workspaceBoxParts, screenPickId } from './geometry.js';
 import { createWorkspaceFixture } from './fixture.js';
 import { createWorkspaceSession } from './session.js';
 import { createCoordinateFrames } from './coordinates.js';
@@ -260,11 +260,18 @@ test('real instance model matrices map rotated box vertices through milestone 1 
     const collection = parent.get(0);
     for (let i = 0; i < collection.length; i++) {
       const instance = collection.get(i).geometryInstances;
-      const node = document.nodes.find((n) => n.id === instance.id);
+      const node = document.nodes.find(
+        (n) =>
+          n.id === instance.id ||
+          (n.kind === 'desk' && instance.id === screenPickId(document)),
+      );
       const part =
         workspaceBoxParts(node)[
           Array.from({ length: i }, (_, j) => collection.get(j)).filter(
-            (p) => p.geometryInstances.id === node.id,
+            (p) =>
+              p.geometryInstances.id === node.id ||
+              (node.kind === 'desk' &&
+                p.geometryInstances.id === screenPickId(document)),
           ).length
         ];
       const min = part.minM,
@@ -361,4 +368,32 @@ test('static prototype one-shot requests preserve unrelated render holds', async
     releaseContinuousRender('unrelated-owner');
     uninstallRenderGovernor(f.viewer);
   }
+});
+
+test('only screen is pickable with a stable part ID; private pick ownership is released on exit', async () => {
+  const parent = new PrimitiveCollection(),
+    screens = new Set();
+  const viewer = { isDestroyed: () => false, scene: { primitives: parent } },
+    document = createWorkspaceFixture();
+  const adapter = createCesiumWorkspaceAdapter({
+    viewer,
+    document,
+    screens,
+    requestRender() {},
+  });
+  const session = createWorkspaceSession({ acquire: adapter.acquire });
+  await session.activate();
+  const collection = parent.get(0);
+  assert.equal(screens.size, 1);
+  for (let i = 0; i < collection.length; i++) {
+    const p = collection.get(i);
+    assert.equal(
+      p.allowPicking,
+      p.geometryInstances.id === screenPickId(document),
+    );
+    assert.equal(screens.has(p), p.allowPicking);
+  }
+  session.dispose();
+  assert.equal(screens.size, 0);
+  parent.destroy();
 });

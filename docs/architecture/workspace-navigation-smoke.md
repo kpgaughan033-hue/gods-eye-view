@@ -13,7 +13,8 @@ development-console prototype, not a new navigation UI or widget.
 - Navigation methods are `enter()`, `enterChild()`, `goTo(nodeId)`, `back()` and
   `exit()`. Inspect `getNavigationState()` for committed `scopeId`, in-flight
   `targetId`, phase, generation, ancestor IDs, diagnostics and console error.
-  The application/widget node cannot be entered in this milestone.
+  Milestone 3 excluded application targets; Milestone 4 below now admits only
+  the existing validated checklist child.
 - `src/workspace/navigation.js` owns committed scope separately from in-flight
   work. History contains only the bounded ancestor path and is updated only on
   success. Back during an uncommitted child entry cancels it and returns to the
@@ -92,7 +93,8 @@ motion as well as playback. Existing normal navigation routes are unchanged.
 4. Await each action: `await w.enter()` reaches the building, then three
    `await w.enterChild()` calls reach floor, office and desk. Each returns true;
    `w.getNavigationState().scopeId` ends at `demo-desk-001`. Inspect the synthetic
-   cutaway exterior, floor, room and desk described below. There is no application widget. Requests without
+   cutaway exterior, floor, room and desk described below. At the desk, Milestone 4
+   adds the monitor/checklist interaction described later in this guide. Requests without
    awaiting use latest-intent semantics, not a queued cinematic sequence.
 5. `await w.back()` returns to office. `await w.goTo('demo-building-001')` visits
    that ancestor. `await w.exit()` restores the captured globe camera. Check
@@ -203,13 +205,14 @@ an open-front architectural model, not an enclosed photorealistic room.
   and amber threshold. The south/east sides stay open for the oblique preset.
 - **Desk:** wood-colored 6 cm desktop with contrasting edge, four dark legs,
   monitor with cyan passive screen, stand/base and pale keyboard. The monitor is
-  just geometry: no interactive widget, DOM surface or application runtime.
+  was passive in issue #9; Milestone 4 below makes only its screen interactive.
 
 `src/workspace/geometry.js` contains 34 box/outline parts in fixture-local
 metres. `cesiumAdapter.js` converts those through the existing coordinate frames
 and owns them in the same private collection. All parts are acquired once per
 session, use opaque flat colors, synchronous tiny box geometry and disabled
-picking. No textures, external assets, extra render loop, render hold, shadows,
+picking in the issue #9 baseline (Milestone 4 enables only the screen). No
+textures, external assets, extra render loop, render hold, shadows,
 provider changes or clipping planes are added. The four camera presets alone
 change framing; lease, transitions, cancellation, scoped settings and captured
 return remain in the existing Milestone 3 owners.
@@ -244,3 +247,143 @@ Firefox compatibility, hardware frame rates or target-machine visual signoff.
 Actual issue #9 screenshots and executed checks are recorded in the
 [evidence directory](evidence/issue-9/README.md). Historical Milestone 3
 results above describe its original validation, not this visual pass.
+
+## Milestone 4 / issue #11: enter the monitor checklist
+
+[Issue #11](https://github.com/kpgaughan033-hue/gods-eye-view/issues/11)
+extends the scoped hierarchy by one existing node, `demo-application-001`.
+It explicitly supersedes the initial design's session-only persistence and
+compact-sheet presentation: this opt-in widget uses bounded versioned local
+storage and fills the viewport. Production and default development startup
+still expose no workspace entry. Fixture IDs, bounds, anchor, globe share
+formats, providers, clearance and global navigation are unchanged.
+
+The light-blue **screen surface only** is pickable, with a stable workspace/desk/
+part ID and an instance-owned primitive membership check. Desktop, legs,
+keyboard, monitor frame and surrounding scene do not activate the checklist.
+The screen gains a projected outline on hover or launcher focus. The keyboard
+launcher and scoped Back/Exit controls are development-only.
+
+`navigation.js` accepts the validated checklist application as a desk child and
+waits for both the leased camera and disposable visual transition before
+committing history. Back uses the captured source desk pose; further Back goes
+office → floor → building → original globe. Explicit Exit retains the same
+<=1 cm / <=0.1° globe-return contract. Manual/external handoff never restores a
+stale camera. No additional camera controller or render loop is introduced.
+
+`cameraAdapter.js` approaches the real screen front in the desk frame, leaving
+the near plane safely in front of it. `screenProjection.js` projects the four
+real front-face corners in CSS pixels using ECEF camera axes and the existing
+frustum. A homography maps the DOM viewport onto that quadrilateral; native CSS
+Web Animations expand it to the viewport while the existing camera flies. Back
+projects the screen at the captured destination desk pose for the reverse
+handoff. No field-of-view modification, texture-painted HTML or second renderer
+is used. Reduced motion skips both animations. Unsupported animation APIs fall
+back to the normal DOM surface; timers and completion callbacks are bounded and
+cancelled with the navigation generation.
+
+The final checklist is ordinary labeled HTML: add, checkbox, delete, empty
+state, visible focus, and native scrolling. A scoped keyboard owner handles
+Tab/Escape; IME composition is left intact. During animation, Back/Exit remain
+available and Escape can cancel. Inputs inside the checklist/launcher preserve
+the lease and stop bubbling globe shortcuts. The existing voice key policy has
+a narrow guard for `data-workspace-input`, including Space on buttons. Input
+outside the owned surface still yields normally. Repeated Back/Exit and new
+search/tracking/share/director authority remove overlays and suppressions
+without stale focus or camera completion.
+
+Screen highlighting after resize waits for a disposable one-shot post-render
+callback, because Cesium updates its aspect/frustum after window resize dispatch.
+It uses the governor for one render request, not a continuous loop. The callback
+is removed after drawing or when the desk presentation leaves. Browser checks
+compare outline/projected corners with Cesium window coordinates at both widths.
+
+Globe chrome is hidden with an **owned temporary attribute and CSS**, not by
+replaying HUD/layer settings or replacing inline styles. Newly mounted chrome
+is covered by a disposable observer. Removing only this owner's attributes
+preserves unrelated visibility/layer edits. Keyboard/pick hooks are scope-owned;
+exit removes the DOM root and active chrome suppression. The instance may reuse
+its detached DOM and checklist store on re-entry; application destruction
+removes listeners, observer, animations, timers, DOM and renderer ownership.
+
+Tasks use `gev:workspace-checklist:v1:<workspaceId>:<stateKey>` in localStorage,
+not geographic/share state. Limits are 100 tasks, 240 UTF-16 code units per task,
+128 characters per task ID and a 262,144-code-unit serialized parse ceiling. Version, duplicate IDs,
+record shapes and field types are validated atomically; corrupt data is ignored.
+Edits save synchronously before any presentation unmount. Storage denial/quota
+failures retain editable in-memory state and show a page-only notice. No backend,
+authentication, agent, workflow, remote widget or provider call is added.
+
+### Required manual Firefox / GitHub Codespaces gate
+
+1. On the Codespace development port, load `?workspacePrototype=1&welcome=0`
+   (the existing `welcome=0` support flag avoids a delayed first-run launcher
+   covering the monitor). Alternatively dismiss the welcome launcher after
+   startup has fully settled. Confirm the
+   ordinary URL has no entry. Use the existing keyless globe stack, wait for
+   startup, and leave tracking/cockpit/director/rocket replay off.
+2. Open DevTools **before** navigation. Record Firefox version, Mac/OS, viewport,
+   renderer and map stack. Keep roughly 800 × 900 of page space for the narrow
+   case; repeat with a wider viewport. Capture the original ECEF pose/settings
+   as in the Milestone 3 procedure above.
+3. Run `const w = window.__godsEyeView.workspacePrototype; await w.enter();`
+   followed by three awaited `w.enterChild()` calls. Confirm `demo-desk-001`.
+   Hover the cyan screen: the outline/cursor should indicate interactivity.
+   Capture the desk. Avoid wheel/scene gestures while inspecting; those yield
+   ownership by design.
+4. Click/tap **inside the light-blue screen**, not its frame. Watch the camera
+   approach and the projected screen expand into the page. Capture/record the
+   transition if practical. The endpoint must be readable normal HTML with no
+   globe HUD covering it and scope `demo-application-001`. Check clipping,
+   skew/interpolation and focus specifically in Firefox.
+5. Add text containing spaces and ordinary globe shortcut letters (`h o v f d c`),
+   press Enter, toggle a task with mouse and Space, delete a task, and verify the
+   empty state. Tab/Shift+Tab should stay in visible controls. Screen-reader
+   labels, focus rings, IME composition and Escape must behave sensibly.
+   Holding Space on a checklist button must not start voice.
+6. Use **Back to desk** or Escape. Verify exact prior desk framing and focus on
+   **Open checklist**. Press Enter/Space there to reopen and verify task state.
+   Back again, then Back through office/floor/building/globe. Explicit Exit from
+   the app must also restore the captured globe pose/settings within tolerance.
+7. Reload, return to desk and reopen: saved tasks should remain. Deny site storage
+   (or test in a restricted context) and confirm editable page-only fallback with
+   a visible notice. Do not use real sensitive tasks for this prototype.
+8. Test rapid entry/Back/Exit during animation, reduced motion in OS/Firefox,
+   resize/DevTools docking, and deliberate outside wheel/keyboard/pointer input.
+   New existing search/tracking/share/director intents must cancel without later
+   snap-back. Confirm HUD/settings return without overwriting unrelated changes.
+9. From separate fresh desk visits, click the desktop, monitor frame and nearby
+   scene. None may enter the application; ordinary outside input may yield the
+   entire workspace. Re-enter using the existing console route when needed.
+10. Repeat 20 open/Back cycles and several full Exit/re-entry cycles. Confirm no
+    root/attribute/primitive/hold growth or console errors. Destroy during entry
+    using the exact loaded `/src/main.js` URL procedure above; no checklist,
+    chrome suppression or owned geometry should survive. Production preview
+    with the same query flag must still have no workspace entry.
+
+Do not merge or request final approval until CI, code review and this manual
+Firefox/Codespaces gate have completed. Software Chromium screenshots and CPU
+contract tests do not grant Firefox visual/accessibility signoff.
+
+### Automated checklist route and evidence
+
+```bash
+PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
+  node scripts/qa-workspace-checklist.mjs \
+  --url http://127.0.0.1:4175 --software \
+  --evidence-dir /tmp/workspace-checklist
+```
+
+The behavioral route uses the normal browser clock and actual monitor clicks,
+keyboard controls, task editing, persistence/reload, exact return, cancellation,
+misses, 20 reduced-motion app cycles and destruction. External browser requests
+and `/api/` requests are blocked to keep provider traffic out of this fixture.
+`--behavior-only` runs just that normal-clock gate. The existing `welcome=0`
+support flag suppresses onboarding only in the QA URL; it changes no default
+startup policy. Optional paused transition captures run on **separate visual-only pages** using
+the same native animation at 350 ms; they are screenshots of real browser output,
+not timing/performance evidence. `--visual-only` repeats only these captures.
+The existing `qa-workspace-navigation.mjs` remains a separate required gate.
+
+Executed results, actual screenshots and known limitations are linked in
+[evidence/issue-11](evidence/issue-11/README.md).
