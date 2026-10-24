@@ -2,6 +2,10 @@ import { createAssetDirectorySource } from '../director/packs/source.js';
 import { createApplicationTools } from '../app/tools.js';
 import { startStandaloneChrome } from './startupChrome.js';
 import { loadToolCatalog } from './toolCatalog.js';
+import {
+  installWorkspaceDevelopmentEntry,
+  workspacePrototypeEnabled,
+} from '../workspace/developmentEntry.js';
 export function createStandaloneTools(options) {
   return createApplicationTools({
     startChrome: startStandaloneChrome,
@@ -17,6 +21,14 @@ export function createStandaloneTools(options) {
       },
     },
     ...options,
+    installDevelopmentWorkspace:
+      import.meta.env.DEV &&
+      workspacePrototypeEnabled({
+        development: true,
+        search: globalThis.location?.search,
+      })
+        ? installWorkspaceDevelopmentEntry
+        : undefined,
     voice: {
       supportedProviders: ['openai', 'gemini'],
       toolCatalog: loadToolCatalog,
