@@ -78,6 +78,115 @@ test('entry requires an explicit development-only query flag', () => {
   );
 });
 
+for (const kind of ['globe handoff', 'manual input']) {
+  test(`newer ${kind} during lazy module load prevents a late navigation claim`, async () => {
+    let handoff, resolve;
+    const canvas = new EventTarget(),
+      cleanups = [],
+      controller = new AbortController();
+    const entry = installWorkspaceDevelopmentEntry({
+      viewer: { scene: { canvas } },
+      signal: controller.signal,
+      defer: (fn) => cleanups.push(fn),
+      debug: {
+        styleManager: {
+          subscribeCameraHandoff(fn) {
+            handoff = fn;
+            return () => {
+              handoff = null;
+            };
+          },
+        },
+      },
+      load: () =>
+        new Promise((yes) => {
+          resolve = yes;
+        }),
+    });
+    const pending = entry.enter();
+    await tick();
+    if (kind === 'globe handoff') handoff();
+    else canvas.dispatchEvent(new Event('wheel'));
+    resolve({
+      createWorkspacePrototypeNavigation() {
+        assert.fail('stale navigation construction');
+      },
+    });
+    assert.equal(await pending, false);
+    for (const cleanup of cleanups.reverse()) cleanup();
+    assert.equal(handoff, null);
+  });
+}
+
+test('rapid enter then exit during lazy import never dispatches the older entry', async () => {
+  let resolve;
+  const cleanups = [],
+    calls = [],
+    controller = new AbortController();
+  const entry = installWorkspaceDevelopmentEntry({
+    viewer: {},
+    signal: controller.signal,
+    debug: {},
+    defer: (fn) => cleanups.push(fn),
+    load: () =>
+      new Promise((yes) => {
+        resolve = yes;
+      }),
+  });
+  const enter = entry.enter(),
+    exit = entry.exit();
+  await tick();
+  resolve({
+    createWorkspacePrototypeNavigation: () => ({
+      enter() {
+        calls.push('BAD enter');
+      },
+      exit() {
+        calls.push('exit');
+        return true;
+      },
+      dispose() {},
+    }),
+  });
+  assert.equal(await enter, false);
+  assert.equal(await exit, true);
+  assert.deepEqual(calls, ['exit']);
+  for (const cleanup of cleanups.reverse()) cleanup();
+});
+
+test('first navigation captures ECEF before awaiting lazy code', async () => {
+  let resolve, captured;
+  const cleanups = [],
+    controller = new AbortController();
+  const camera = {
+    positionWC: { x: 1.123456789, y: 2, z: 3 },
+    directionWC: { x: 0, y: 1, z: 0 },
+    upWC: { x: 0, y: 0, z: 1 },
+  };
+  const entry = installWorkspaceDevelopmentEntry({
+    viewer: { camera },
+    signal: controller.signal,
+    debug: {},
+    defer: (fn) => cleanups.push(fn),
+    load: () =>
+      new Promise((yes) => {
+        resolve = yes;
+      }),
+  });
+  const pending = entry.enter();
+  camera.positionWC.x = 100;
+  await tick();
+  resolve({
+    createWorkspacePrototypeNavigation({ initialPose }) {
+      captured = initialPose;
+      return { enter: () => true, dispose() {} };
+    },
+  });
+  assert.equal(await pending, true);
+  assert.equal(captured.position[0], 1.123456789);
+  for (const cleanup of cleanups.reverse()) cleanup();
+});
+
 test('installer registers cleanup synchronously and remains lazy until explicit activation', async () => {
   const f = fixture();
   assert.ok(f.cleanups.length);

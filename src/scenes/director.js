@@ -1732,6 +1732,10 @@ export class SceneDirector {
   get running() {
     return this._running;
   }
+  /** Includes pending LOAD and retained authored motion, not only a running queue. */
+  get cameraBusy() {
+    return this._running || this._usesAuthoredCamera || !!this._loadAbort;
+  }
 
   /**
    * Start a full scene run beginning at the given scene.

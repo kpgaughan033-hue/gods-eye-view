@@ -41,12 +41,19 @@ export function createApplicationControls({
   defer(() => cockpitCloudEffects?.destroy());
 
   // If no share link state, do default fly-to Austin
+  let cancelStartupCamera = () => {};
   if (!styleManager.hasShareState) {
     loaderStatus.textContent = t('Flying to Austin, TX...');
-    defer(flyToAustin(viewer));
+    cancelStartupCamera = flyToAustin(viewer);
+    defer(cancelStartupCamera);
   } else {
     loaderStatus.textContent = t('Restoring shared view...');
   }
 
-  return { styleManager, weatherEffects, cockpitCloudEffects };
+  return {
+    styleManager,
+    weatherEffects,
+    cockpitCloudEffects,
+    cancelStartupCamera,
+  };
 }

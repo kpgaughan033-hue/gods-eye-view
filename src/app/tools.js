@@ -201,6 +201,12 @@ export function createApplicationTools({
     }),
   );
   // Optional installer must register ownership through defer before async work.
-  installDevelopmentWorkspace?.({ viewer, signal, defer, debug });
+  installDevelopmentWorkspace?.({
+    viewer,
+    signal,
+    defer,
+    debug,
+    cancelStartupCamera: controls.cancelStartupCamera,
+  });
   return { sceneDirector, annotations, voiceCommands };
 }

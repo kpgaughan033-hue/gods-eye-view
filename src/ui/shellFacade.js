@@ -8,6 +8,9 @@ export class ShellFacade {
   subscribeCameraHandoff(listener) {
     return this._navigation.subscribeCameraHandoff(listener);
   }
+  claimScopedCamera(options) {
+    return this._navigation.claimScopedCamera(options);
+  }
 
   get _models3dModeBtns() {
     return this._aircraftDisplay._models3dModeBtns;
